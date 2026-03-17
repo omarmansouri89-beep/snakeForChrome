@@ -24,17 +24,14 @@ let velocity = { x: 0, y: 0 };
 let nextVelocity = { x: 0, y: 0 }; 
 let food = {};
 let particles = [];
+let isPaused = false; // NIEUW: Houdt bij of het spel op pauze staat
 
-// --- NIEUW: 5 Verschillende Snoepjes (Neon Kleuren) ---
 const candies = [
-    { color: '#ff3366' }, // Roze
-    { color: '#33ccff' }, // Blauw
-    { color: '#ffea00' }, // Geel
-    { color: '#cc33ff' }, // Paars
-    { color: '#ff9900' }  // Oranje
+    { color: '#ff3366' }, { color: '#33ccff' }, { color: '#ffea00' }, 
+    { color: '#cc33ff' }, { color: '#ff9900' }  
 ];
 
-// --- Mute Knop Logica ---
+// --- Mute Knop ---
 muteButton.addEventListener('click', () => {
     if (bgMusic.paused) {
         bgMusic.play();
@@ -53,7 +50,6 @@ function playSound(type) {
 
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
-
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
@@ -76,21 +72,16 @@ function playSound(type) {
     }
 }
 
-// --- Particle Systeem (Neemt nu snoepjes-kleur over) ---
+// --- Particle Systeem ---
 class Particle {
     constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
+        this.x = x; this.y = y;
         this.vx = (Math.random() - 0.5) * 10;
         this.vy = (Math.random() - 0.5) * 10;
         this.life = 1.0; 
-        this.color = color; // Kleur is nu dynamisch
+        this.color = color; 
     }
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.life -= 0.05; 
-    }
+    update() { this.x += this.vx; this.y += this.vy; this.life -= 0.05; }
     draw(ctx) {
         ctx.globalAlpha = Math.max(0, this.life); 
         ctx.fillStyle = this.color;
@@ -149,18 +140,14 @@ function showNewGamePrompt() {
         <p>Je score was: ${score}</p>
         <button id="newGameButton" style="padding:10px 20px; cursor:pointer; font-weight:bold; border:none; border-radius:5px; background-color:#333; color:white;">Nieuwe Game</button>
     `;
-    document.getElementById('newGameButton').onclick = () => {
-        gameOverOverlay.classList.add('hidden');
-        resetGame();
-    };
+    document.getElementById('newGameButton').onclick = () => resetGame();
 }
 
 function renderHighscores() {
     const highscores = getHighscores();
     scoresList.innerHTML = ''; 
     if (highscores.length === 0) {
-        scoresList.innerHTML = '<li>Nog geen scores!</li>';
-        return;
+        scoresList.innerHTML = '<li>Nog geen scores!</li>'; return;
     }
     highscores.forEach((item, index) => {
         const li = document.createElement('li');
@@ -194,15 +181,10 @@ function gameLoop() {
         score++;
         scoreDisplay.textContent = score;
         playSound('eat'); 
-        
-        // Geef de kleur van het gegeten snoepje door aan de explosie!
         createExplosion(food.x, food.y, candies[food.type].color); 
         placeFood();
 
-        // NIEUW: Snelheid verhogen per 5 punten
-        if (score % 5 === 0) {
-            startGame(); // Herstart het interval met de nieuwe, hogere snelheid
-        }
+        if (score % 5 === 0) startGame(); 
     } else {
         snake.pop();
     }
@@ -212,15 +194,9 @@ function gameLoop() {
 
 function startGame() {
     clearInterval(gameInterval); 
-    
-    // NIEUW: Snelheidslogica
-    // Start op 200ms (lekker traag). Elke 5 punten doen we de tijd * 0.9 (dus 10% sneller).
     const level = Math.floor(score / 5);
     let speed = 200 * Math.pow(0.9, level);
-    
-    // Zorg dat het nooit onspeelbaar snel wordt (maximaal 60ms)
     speed = Math.max(60, speed); 
-    
     gameInterval = setInterval(gameLoop, speed);
 }
 
@@ -229,9 +205,7 @@ function drawGame() {
     ctx.fillStyle = '#1e1e1e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Bepaal welk snoepje er getekend moet worden
     const currentCandy = candies[food.type];
-
     ctx.shadowBlur = 15;
     ctx.shadowColor = currentCandy.color;
     ctx.fillStyle = currentCandy.color;
@@ -247,14 +221,27 @@ function drawGame() {
         ctx.roundRect(segment.x * gridSize + 1, segment.y * gridSize + 1, gridSize - 2, gridSize - 2, 4);
         ctx.fill();
     });
-
     ctx.shadowBlur = 0;
 
     particles.forEach((p, index) => {
-        p.update();
-        p.draw(ctx);
+        p.update(); p.draw(ctx);
         if (p.life <= 0) particles.splice(index, 1); 
     });
+}
+
+function drawPauseScreen() {
+    // Semi-transparante zwarte laag over het spel
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Neon PAUZE tekst
+    ctx.fillStyle = '#33ccff';
+    ctx.font = 'bold 40px "Segoe UI"';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#33ccff';
+    ctx.fillText('PAUZE', canvas.width / 2, canvas.height / 2 + 10);
+    ctx.shadowBlur = 0; 
 }
 
 function placeFood() {
@@ -263,7 +250,6 @@ function placeFood() {
         newFood = {
             x: Math.floor(Math.random() * tileCount),
             y: Math.floor(Math.random() * tileCount),
-            // Kies een willekeurig getal van 0 tot 4 voor het type snoepje
             type: Math.floor(Math.random() * candies.length) 
         };
     } while (checkCollision(newFood, snake));
@@ -275,20 +261,44 @@ function checkCollision(point, array) {
 }
 
 function resetGame() {
+    // 100% zeker de overlay verbergen bij het starten van een nieuw potje!
+    gameOverOverlay.classList.add('hidden'); 
+    
     snake = [{ x: 10, y: 10 }];
     velocity = { x: 0, y: 0 };
     nextVelocity = { x: 0, y: 0 };
     score = 0;
     particles = []; 
+    isPaused = false;
     scoreDisplay.textContent = score;
     placeFood();
     drawGame();
 }
 
-// --- Input ---
+// --- Input & Pauze Logica ---
 document.addEventListener('keydown', (event) => {
+    // Negeer input als het Game Over is
     if (!gameOverOverlay.classList.contains('hidden')) return;
     
+    // SPATIEBALK LOGICA (Pauzeren/Hervatten)
+    if (event.code === 'Space') {
+        event.preventDefault(); // Voorkom dat de pagina omlaag scrollt
+        
+        // Niet pauzeren als het spel nog niet begonnen is
+        if (velocity.x === 0 && velocity.y === 0 && nextVelocity.x === 0 && nextVelocity.y === 0) return;
+
+        if (isPaused) {
+            isPaused = false;
+            startGame(); // Hervat
+        } else {
+            isPaused = true;
+            clearInterval(gameInterval); // Stop de game loop
+            drawPauseScreen(); // Teken pauze-scherm
+        }
+        return; // Stop hier, we willen geen pijltjestoetsen logica uitvoeren
+    }
+
+    // PIJLTJESTOETSEN LOGICA
     switch (event.key) {
         case 'ArrowUp': if (velocity.y !== 1) nextVelocity = { x: 0, y: -1 }; break;
         case 'ArrowDown': if (velocity.y !== -1) nextVelocity = { x: 0, y: 1 }; break;
@@ -296,13 +306,23 @@ document.addEventListener('keydown', (event) => {
         case 'ArrowRight': if (velocity.x !== -1) nextVelocity = { x: 1, y: 0 }; break;
     }
 
-    if (velocity.x === 0 && velocity.y === 0 && (nextVelocity.x !== 0 || nextVelocity.y !== 0)) {
-        startGame();
-        if (bgMusic.paused) {
-            bgMusic.play().catch(e => console.log("Audio play prevented by browser policy"));
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault();
+        
+        // Als het spel gepauzeerd stond, en we drukken op een pijl, hervat dan direct!
+        if (isPaused) {
+            isPaused = false;
+            startGame();
+        }
+
+        // Start het spel (voor de eerste keer)
+        if (velocity.x === 0 && velocity.y === 0 && (nextVelocity.x !== 0 || nextVelocity.y !== 0)) {
+            startGame();
+            if (bgMusic.paused) {
+                bgMusic.play().catch(e => console.log("Audio play prevented by browser policy"));
+            }
         }
     }
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) event.preventDefault();
 });
 
 resetGame();
