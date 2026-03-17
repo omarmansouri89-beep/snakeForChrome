@@ -3,12 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Browser Snake</title>
+    <title>SOWEDO Snake</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div id="gameContainer">
+        
+        <div id="sowedoBanner">
+            <p>Speciaal gebouwd voor de sollicitatie bij</p>
+            <h2>SOWEDO</h2>
+            <div class="glow-line"></div>
+        </div>
         
         <div id="gameArea">
             <h1>Browser Snake</h1>
@@ -21,8 +27,13 @@
             </div>
 
             <canvas id="gameCanvas" width="400" height="400"></canvas>
-            <p>Gebruik de **pijltjestoetsen** (↑, ↓, ←, →) om te bewegen.</p>
-            <p>Score: <span id="score">0</span></p>
+            
+            <div class="instructions">
+                <p>🕹️ Gebruik de **pijltjestoetsen** (↑, ↓, ←, →) om te bewegen.</p>
+                <p>⏸️ Druk op **Spatie** om te pauzeren of te hervatten.</p>
+            </div>
+            
+            <p style="font-size: 1.2em; font-weight: bold;">Score: <span id="score" style="color: #00ff80;">0</span></p>
         </div>
 
         <div id="highscores">
