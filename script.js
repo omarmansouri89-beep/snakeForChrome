@@ -6,60 +6,131 @@ const gameOverOverlay = document.getElementById('gameOverOverlay');
 const gameOverContent = document.getElementById('gameOverContent');
 const scoresList = document.getElementById('scoresList');
 
+// --- Audio Elementen ---
+const bgMusic = document.getElementById('bgMusic');
+const muteButton = document.getElementById('muteButton');
+let audioCtx; 
+bgMusic.volume = 0.3; 
+
 // --- Spelinstellingen ---
-const gridSize = 20;
+const gridSize = 20; 
 const tileCount = canvas.width / gridSize;
 let score = 0;
-let gameInterval;
+let gameInterval; 
 const MAX_HIGHSCORES = 10;
 
-// --- Spelobjecten ---
 let snake = [];
-let velocity = { x: 0, y: 0 };
-let nextVelocity = { x: 0, y: 0 };
+let velocity = { x: 0, y: 0 }; 
+let nextVelocity = { x: 0, y: 0 }; 
 let food = {};
-let spider = null; // Kan een spin-object bevatten of null zijn
-let spiderMoveCounter = 0;
+let particles = [];
 
-// --- Highscore Logica (ongewijzigd) ---
+// --- NIEUW: 5 Verschillende Snoepjes (Neon Kleuren) ---
+const candies = [
+    { color: '#ff3366' }, // Roze
+    { color: '#33ccff' }, // Blauw
+    { color: '#ffea00' }, // Geel
+    { color: '#cc33ff' }, // Paars
+    { color: '#ff9900' }  // Oranje
+];
 
-function getHighscores() {
-    const scores = localStorage.getItem('snakeHighscores');
-    return scores ? JSON.parse(scores) : [];
+// --- Mute Knop Logica ---
+muteButton.addEventListener('click', () => {
+    if (bgMusic.paused) {
+        bgMusic.play();
+        muteButton.textContent = "🔊 Muziek Aan/Uit";
+    } else {
+        bgMusic.pause();
+        muteButton.textContent = "🔇 Muziek Aan/Uit";
+    }
+    muteButton.blur(); 
+});
+
+// --- Geluidseffecten ---
+function playSound(type) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (bgMusic.paused && bgMusic.currentTime > 0) return;
+
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    if (type === 'eat') {
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'die') {
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.3);
+    }
 }
 
-function saveHighscores(scores) {
-    localStorage.setItem('snakeHighscores', JSON.stringify(scores));
+// --- Particle Systeem (Neemt nu snoepjes-kleur over) ---
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10;
+        this.life = 1.0; 
+        this.color = color; // Kleur is nu dynamisch
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.05; 
+    }
+    draw(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life); 
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0; 
+    }
 }
+
+function createExplosion(x, y, color) {
+    for (let i = 0; i < 15; i++) {
+        particles.push(new Particle(x * gridSize + gridSize/2, y * gridSize + gridSize/2, color));
+    }
+}
+
+// --- Highscore Logica ---
+function getHighscores() { return JSON.parse(localStorage.getItem('snakeHighscores')) || []; }
+function saveHighscores(scores) { localStorage.setItem('snakeHighscores', JSON.stringify(scores)); }
 
 function checkAndDisplayHighscore() {
     const highscores = getHighscores();
-    const isHighscore = highscores.length < MAX_HIGHSCORES || score > highscores[highscores.length - 1].score;
+    const isHighscore = highscores.length < MAX_HIGHSCORES || score > (highscores[highscores.length - 1]?.score || 0);
+
     gameOverOverlay.classList.remove('hidden');
+
     if (isHighscore) {
         gameOverContent.innerHTML = `
-            <h2>Nieuwe Highscore!</h2>
+            <h2 style="color: #00ff80;">Nieuwe Highscore!</h2>
             <p>Je score: ${score}</p>
-            <p>Gefeliciteerd! Vul je naam in:</p>
-            <input type="text" id="nameInput" placeholder="Je naam" maxlength="15">
-            <button id="submitScoreButton">Opslaan</button>
+            <input type="text" id="nameInput" placeholder="Je naam" maxlength="15" style="padding:10px; width:80%; margin-bottom:10px;">
+            <br><button id="submitScoreButton" style="padding:10px 20px; cursor:pointer; font-weight:bold; border:none; border-radius:5px; background-color:#00ff80; color:#121212;">Opslaan</button>
         `;
         document.getElementById('submitScoreButton').onclick = () => {
             const name = document.getElementById('nameInput').value.trim() || "Anoniem";
             addHighscore(name, score);
-            showNewGamePrompt();
+            showNewGamePrompt(); 
         };
     } else {
-        gameOverContent.innerHTML = `
-            <h2>Game Over</h2>
-            <p>Je score: ${score}</p>
-            <p>Jammer, net geen top 10.</p>
-            <button id="newGameButton">Nieuwe Game</button>
-        `;
-        document.getElementById('newGameButton').onclick = () => {
-            gameOverOverlay.classList.add('hidden');
-            resetGame();
-        };
+        showNewGamePrompt();
     }
 }
 
@@ -67,18 +138,16 @@ function addHighscore(name, score) {
     let highscores = getHighscores();
     highscores.push({ name, score });
     highscores.sort((a, b) => b.score - a.score);
-    if (highscores.length > MAX_HIGHSCORES) {
-        highscores = highscores.slice(0, MAX_HIGHSCORES);
-    }
+    if (highscores.length > MAX_HIGHSCORES) highscores = highscores.slice(0, MAX_HIGHSCORES);
     saveHighscores(highscores);
     renderHighscores();
 }
 
 function showNewGamePrompt() {
     gameOverContent.innerHTML = `
-        <h2>Score Opgeslagen!</h2>
-        <p>Start een nieuw spel.</p>
-        <button id="newGameButton">Nieuwe Game</button>
+        <h2 style="color: #ff3366;">Game Over</h2>
+        <p>Je score was: ${score}</p>
+        <button id="newGameButton" style="padding:10px 20px; cursor:pointer; font-weight:bold; border:none; border-radius:5px; background-color:#333; color:white;">Nieuwe Game</button>
     `;
     document.getElementById('newGameButton').onclick = () => {
         gameOverOverlay.classList.add('hidden');
@@ -88,240 +157,117 @@ function showNewGamePrompt() {
 
 function renderHighscores() {
     const highscores = getHighscores();
-    scoresList.innerHTML = '';
+    scoresList.innerHTML = ''; 
     if (highscores.length === 0) {
-        scoresList.innerHTML = '<li>Nog geen scores! Speel nu!</li>';
+        scoresList.innerHTML = '<li>Nog geen scores!</li>';
         return;
     }
     highscores.forEach((item, index) => {
         const li = document.createElement('li');
-        li.innerHTML = `${index + 1}. ${item.name} <span>${item.score}</span>`;
+        li.innerHTML = `<span>${index + 1}. ${item.name}</span> <span style="color:#00ff80">${item.score}</span>`;
         scoresList.appendChild(li);
     });
 }
 
-// --- Game Loop en Kernlogica ---
-
+// --- Game Loop ---
 function gameLoop() {
-    // 1. Beweging en Richting Updaten
     velocity = { ...nextVelocity };
     let head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
 
-    // 2. Botsingsdetectie (Game Over)
     if (
-        velocity.x === 0 && velocity.y === 0 ||
-        head.x < 0 || head.x >= tileCount ||
-        head.y < 0 || head.y >= tileCount ||
-        checkCollision(head, snake.slice(1))
+        (velocity.x === 0 && velocity.y === 0) || 
+        head.x < 0 || head.x >= tileCount || 
+        head.y < 0 || head.y >= tileCount || 
+        checkCollision(head, snake.slice(1)) 
     ) {
         if (!(velocity.x === 0 && velocity.y === 0)) {
-            clearInterval(gameInterval);
+            clearInterval(gameInterval); 
+            playSound('die'); 
             checkAndDisplayHighscore();
         }
-        return;
+        return; 
     }
 
-    // 3. Nieuwe kop toevoegen
     snake.unshift(head);
 
-    // 4. Eten oppakken
-    let ateSomething = false;
-    // Eet normaal/gouden voedsel
     if (head.x === food.x && head.y === food.y) {
-        score += food.points;
-        ateSomething = true;
-        placeFood();
-    }
-    // Eet de spin
-    if (spider && head.x === spider.x && head.y === spider.y) {
-        score += 5;
-        ateSomething = true;
-        spider = null; // Verwijder de spin
-    }
-    
-    if (ateSomething) {
+        score++;
         scoreDisplay.textContent = score;
+        playSound('eat'); 
+        
+        // Geef de kleur van het gegeten snoepje door aan de explosie!
+        createExplosion(food.x, food.y, candies[food.type].color); 
+        placeFood();
+
+        // NIEUW: Snelheid verhogen per 5 punten
+        if (score % 5 === 0) {
+            startGame(); // Herstart het interval met de nieuwe, hogere snelheid
+        }
     } else {
-        snake.pop(); // Verwijder staart als er niets gegeten is
+        snake.pop();
     }
 
-    // 5. Spin logica
-    // Laat een spin verschijnen als er geen is en de score > 5
-    if (!spider && score > 5 && Math.random() < 0.02) {
-        placeSpider();
-    }
-    // Beweeg de spin
-    if (spider) {
-        moveSpider();
-    }
-
-    // 6. Tekenen
     drawGame();
 }
 
 function startGame() {
-    clearInterval(gameInterval);
-    const speed = 150 - Math.min(score, 100) * 1.2; // Iets aangepaste snelheidscurve
+    clearInterval(gameInterval); 
+    
+    // NIEUW: Snelheidslogica
+    // Start op 200ms (lekker traag). Elke 5 punten doen we de tijd * 0.9 (dus 10% sneller).
+    const level = Math.floor(score / 5);
+    let speed = 200 * Math.pow(0.9, level);
+    
+    // Zorg dat het nooit onspeelbaar snel wordt (maximaal 60ms)
+    speed = Math.max(60, speed); 
+    
     gameInterval = setInterval(gameLoop, speed);
 }
 
-
 // --- Tekenfuncties ---
-
 function drawGame() {
-    // Achtergrond
-    ctx.fillStyle = '#c2b280';
+    ctx.fillStyle = '#1e1e1e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Voedsel tekenen
-    ctx.fillStyle = food.color;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 8;
-    ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
-    ctx.shadowBlur = 0; // Reset schaduw
+    // Bepaal welk snoepje er getekend moet worden
+    const currentCandy = candies[food.type];
 
-    // Spin tekenen
-    if (spider) {
-        const centerX = spider.x * gridSize + gridSize / 2;
-        const centerY = spider.y * gridSize + gridSize / 2;
-        ctx.fillStyle = '#333';
-        // Lichaam
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, gridSize / 2.5, 0, 2 * Math.PI);
-        ctx.fill();
-        // Poten
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 8; i++) {
-             ctx.beginPath();
-             ctx.moveTo(centerX, centerY);
-             const angle = (Math.PI / 4) * i;
-             ctx.lineTo(centerX + Math.cos(angle) * gridSize, centerY + Math.sin(angle) * gridSize);
-             ctx.stroke();
-        }
-    }
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = currentCandy.color;
+    ctx.fillStyle = currentCandy.color;
+    ctx.beginPath();
+    ctx.arc(food.x * gridSize + gridSize/2, food.y * gridSize + gridSize/2, gridSize/2 - 2, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Slang tekenen
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#00ff80';
     snake.forEach((segment, index) => {
-        const centerX = segment.x * gridSize + gridSize / 2;
-        const centerY = segment.y * gridSize + gridSize / 2;
+        ctx.fillStyle = index === 0 ? '#00ffaa' : '#00cc66'; 
+        ctx.beginPath();
+        ctx.roundRect(segment.x * gridSize + 1, segment.y * gridSize + 1, gridSize - 2, gridSize - 2, 4);
+        ctx.fill();
+    });
 
-        if (index === 0) { // De kop
-            const gradient = ctx.createRadialGradient(centerX, centerY, 1, centerX, centerY, gridSize / 1.5);
-            gradient.addColorStop(0, '#38761d');
-            gradient.addColorStop(1, '#274e13');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, gridSize / 1.8, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // Ogen
-            drawEyes(centerX, centerY);
+    ctx.shadowBlur = 0;
 
-        } else { // Het lichaam
-            const gradient = ctx.createRadialGradient(centerX, centerY, 1, centerX, centerY, gridSize / 2);
-            gradient.addColorStop(0, '#93c47d');
-            gradient.addColorStop(1, '#38761d');
-            ctx.fillStyle = gradient;
-
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, gridSize / 2, 0, 2 * Math.PI);
-            ctx.fill();
-        }
+    particles.forEach((p, index) => {
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0) particles.splice(index, 1); 
     });
 }
 
-function drawEyes(centerX, centerY) {
-    const eyeOffsetX = velocity.x * (gridSize / 5);
-    const eyeOffsetY = velocity.y * (gridSize / 5);
-    const eyeRadius = gridSize / 8;
-
-    ctx.fillStyle = 'white';
-    // Oog 1
-    ctx.beginPath();
-    ctx.arc(centerX - eyeOffsetY - (gridSize / 5), centerY + eyeOffsetX - (gridSize / 5), eyeRadius, 0, 2 * Math.PI);
-    ctx.fill();
-    // Oog 2
-    ctx.beginPath();
-    ctx.arc(centerX + eyeOffsetY - (gridSize / 5), centerY - eyeOffsetX - (gridSize / 5), eyeRadius, 0, 2 * Math.PI);
-    ctx.fill();
-
-    ctx.fillStyle = 'black';
-     // Pupil 1
-    ctx.beginPath();
-    ctx.arc(centerX - eyeOffsetY - (gridSize / 5) + (velocity.x * 2), centerY + eyeOffsetX - (gridSize / 5) + (velocity.y * 2), eyeRadius/2, 0, 2 * Math.PI);
-    ctx.fill();
-    // Pupil 2
-    ctx.beginPath();
-    ctx.arc(centerX + eyeOffsetY - (gridSize / 5) + (velocity.x * 2), centerY - eyeOffsetX - (gridSize / 5) + (velocity.y * 2), eyeRadius/2, 0, 2 * Math.PI);
-    ctx.fill();
-}
-
-
-// --- Hulplogica ---
-
 function placeFood() {
-    // 15% kans op een gouden appel, anders een normale
-    if (Math.random() < 0.15) {
-        food = {
-            type: 'golden',
-            points: 3,
-            color: 'gold'
-        };
-    } else {
-        food = {
-            type: 'normal',
-            points: 1,
-            color: 'red'
-        };
-    }
-    
-    let newFoodPos;
+    let newFood;
     do {
-        newFoodPos = {
+        newFood = {
             x: Math.floor(Math.random() * tileCount),
-            y: Math.floor(Math.random() * tileCount)
+            y: Math.floor(Math.random() * tileCount),
+            // Kies een willekeurig getal van 0 tot 4 voor het type snoepje
+            type: Math.floor(Math.random() * candies.length) 
         };
-    } while (checkCollision(newFoodPos, snake) || (spider && spider.x === newFoodPos.x && spider.y === newFoodPos.y));
-
-    food.x = newFoodPos.x;
-    food.y = newFoodPos.y;
-}
-
-function placeSpider() {
-    let newSpiderPos;
-    do {
-        newSpiderPos = {
-            x: Math.floor(Math.random() * tileCount),
-            y: Math.floor(Math.random() * tileCount)
-        };
-    } while (checkCollision(newSpiderPos, snake) || (food && food.x === newSpiderPos.x && food.y === newSpiderPos.y));
-
-    spider = newSpiderPos;
-}
-
-function moveSpider() {
-    spiderMoveCounter++;
-    // Beweeg de spin slechts eens in de 5 game ticks voor een rustiger effect
-    if (spiderMoveCounter % 5 !== 0) {
-        return;
-    }
-
-    const moves = [-1, 0, 1];
-    let dx = moves[Math.floor(Math.random() * moves.length)];
-    let dy = moves[Math.floor(Math.random() * moves.length)];
-
-    // Voorkom dat de spin stilstaat als het kan bewegen
-    if (dx === 0 && dy === 0) dx = 1;
-
-    const newX = spider.x + dx;
-    const newY = spider.y + dy;
-
-    // Check of de nieuwe positie binnen het veld en niet op de slang is
-    if (newX >= 0 && newX < tileCount && newY >= 0 && newY < tileCount && !checkCollision({x: newX, y: newY}, snake)) {
-        spider.x = newX;
-        spider.y = newY;
-    }
+    } while (checkCollision(newFood, snake));
+    food = newFood;
 }
 
 function checkCollision(point, array) {
@@ -329,47 +275,35 @@ function checkCollision(point, array) {
 }
 
 function resetGame() {
-    snake = [{ x: 15, y: 15 }]; // Aangepaste startpositie voor groter veld
+    snake = [{ x: 10, y: 10 }];
     velocity = { x: 0, y: 0 };
     nextVelocity = { x: 0, y: 0 };
     score = 0;
+    particles = []; 
     scoreDisplay.textContent = score;
-    spider = null; // Reset de spin
     placeFood();
     drawGame();
 }
 
-// --- Input (Pijltjestoetsen) (ongewijzigd) ---
-
+// --- Input ---
 document.addEventListener('keydown', (event) => {
-    if (!gameOverOverlay.classList.contains('hidden')) {
-        return;
-    }
+    if (!gameOverOverlay.classList.contains('hidden')) return;
     
     switch (event.key) {
-        case 'ArrowUp':
-            if (velocity.y !== 1) nextVelocity = { x: 0, y: -1 };
-            break;
-        case 'ArrowDown':
-            if (velocity.y !== -1) nextVelocity = { x: 0, y: 1 };
-            break;
-        case 'ArrowLeft':
-            if (velocity.x !== 1) nextVelocity = { x: -1, y: 0 };
-            break;
-        case 'ArrowRight':
-            if (velocity.x !== -1) nextVelocity = { x: 1, y: 0 };
-            break;
+        case 'ArrowUp': if (velocity.y !== 1) nextVelocity = { x: 0, y: -1 }; break;
+        case 'ArrowDown': if (velocity.y !== -1) nextVelocity = { x: 0, y: 1 }; break;
+        case 'ArrowLeft': if (velocity.x !== 1) nextVelocity = { x: -1, y: 0 }; break;
+        case 'ArrowRight': if (velocity.x !== -1) nextVelocity = { x: 1, y: 0 }; break;
     }
 
     if (velocity.x === 0 && velocity.y === 0 && (nextVelocity.x !== 0 || nextVelocity.y !== 0)) {
         startGame();
+        if (bgMusic.paused) {
+            bgMusic.play().catch(e => console.log("Audio play prevented by browser policy"));
+        }
     }
-    
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-        event.preventDefault();
-    }
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) event.preventDefault();
 });
 
-// --- Initialisatie ---
 resetGame();
 renderHighscores();
