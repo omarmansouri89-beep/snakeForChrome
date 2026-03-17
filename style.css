@@ -1,0 +1,117 @@
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Iets moderner lettertype */
+    background-color: #f0e68c; /* Zanderig geel */
+    margin-top: 20px;
+}
+
+/* Flexbox om de game area en highscores naast elkaar te zetten */
+#gameContainer {
+    display: flex;
+    gap: 40px; /* Ruimte tussen het spel en de highscores */
+    align-items: flex-start; /* Lijn de bovenkanten uit */
+}
+
+#gameCanvas {
+    border: 8px solid #8b4513; /* Donkerbruine, houtachtige rand */
+    background-color: #c2b280; /* Aardse tint voor speelveld */
+    display: block;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); /* Meer diepte */
+}
+
+h1 {
+    color: #556b2f; /* Donker olijfgroen */
+    margin-top: 0;
+    text-align: center;
+}
+
+p {
+    text-align: center;
+}
+
+
+/* Highscores Styling */
+#highscores {
+    width: 250px;
+    background-color: #fffaf0; /* Gebroken wit */
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    height: fit-content; /* Past zich aan de content aan */
+    border: 1px solid #ddd;
+}
+
+#highscores h2 {
+    color: #8b4513; /* Zelfde als de rand */
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+    margin-top: 0;
+}
+
+#scoresList li {
+    padding: 5px 0;
+    border-bottom: 1px dashed #eee;
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+}
+
+/* GAME OVER Overlay Styling (ongewijzigd) */
+#gameOverOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+#gameOverOverlay.hidden {
+    display: none;
+}
+
+#gameOverContent {
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    width: 300px;
+}
+
+#gameOverContent h2 {
+    color: #cc0000;
+    margin-top: 0;
+}
+
+#nameInput {
+    padding: 10px;
+    margin: 10px 0;
+    width: 80%;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+#submitScoreButton, #newGameButton {
+    padding: 10px 20px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+#submitScoreButton {
+    background-color: #556b2f; /* Groen passend bij thema */
+    color: white;
+}
+
+#newGameButton {
+    background-color: #333;
+    color: white;
+}
