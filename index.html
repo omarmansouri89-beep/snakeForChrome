@@ -12,7 +12,15 @@
         
         <div id="gameArea">
             <h1>Browser Snake</h1>
-            <canvas id="gameCanvas" width="600" height="600"></canvas>
+            
+            <audio id="bgMusic" loop src="music.mp3"></audio>
+            <div style="margin-bottom: 15px;">
+                <button id="muteButton" style="padding: 5px 10px; background: #333; color: #fff; border: 1px solid #00ff80; border-radius: 4px; cursor: pointer;">
+                    🔊 Muziek Aan/Uit
+                </button>
+            </div>
+
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
             <p>Gebruik de **pijltjestoetsen** (↑, ↓, ←, →) om te bewegen.</p>
             <p>Score: <span id="score">0</span></p>
         </div>
